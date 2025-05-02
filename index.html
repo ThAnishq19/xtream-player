@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Xtream Player</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2980b9;
+            --dark-color: #2c3e50;
+            --light-color: #ecf0f1;
+            --danger-color: #e74c3c;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: #f5f5f5;
+            color: #333;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        header {
+            background-color: var(--dark-color);
+            color: white;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+        
+        .player-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .video-container {
+            width: 100%;
+            background-color: #000;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        #video-player {
+            width: 100%;
+            display: block;
+        }
+        
+        .content-container {
+            background-color: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .tabs {
+            display: flex;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .tab {
+            padding: 10px 15px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+        
+        .tab.active {
+            border-bottom: 2px solid var(--primary-color);
+            font-weight: bold;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .channel-list {
+            list-style: none;
+        }
+        
+        .channel-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+        }
+        
+        .channel-item:hover {
+            background-color: #f9f9f9;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        
+        .error {
+            color: var(--danger-color);
+            padding: 10px;
+            background-color: #ffebee;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        
+        .config-form {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        button:hover {
+            background-color: var(--secondary-color);
+        }
+        
+        @media (min-width: 768px) {
+            .player-container {
+                flex-direction: row;
+            }
+            
+            .video-container {
+                flex: 2;
+            }
+            
+            .content-container {
+                flex: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Xtream Player</h1>
+            <p id="server-info">Not connected</p>
+        </header>
+        
+        <div class="config-form" id="config-form">
+            <h2>Server Configuration</h2>
+            <div class="form-group">
+                <label for="server-url">Server URL</label>
+                <input type="text" id="server-url" placeholder="http://example.com:8080" value="http://starshare.st:80">
+            </div>
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" placeholder="Your username" value="588994">
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="text" id="password" placeholder="Your password" value="580047">
+            </div>
+            <button id="save-config">Save Configuration</button>
+        </div>
+        
+        <div class="player-container">
+            <div class="video-container">
+                <video id="video-player" controls></video>
+            </div>
+            
+            <div class="content-container">
+                <div class="tabs">
+                    <div class="tab active" data-tab="live">Live TV</div>
+                    <div class="tab" data-tab="vod">Movies</div>
+                </div>
+                
+                <div class="tab-content active" id="live-tab">
+                    <div class="channel-list" id="live-channels"></div>
+                    <div class="loading" id="live-loading">Loading channels...</div>
+                    <div class="error" id="live-error" style="display: none;"></div>
+                </div>
+                
+                <div class="tab-content" id="vod-tab">
+                    <div class="channel-list" id="vod-channels"></div>
+                    <div class="loading" id="vod-loading">Loading movies...</div>
+                    <div class="error" id="vod-error" style="display: none;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Configuration
+        let config = {
+            server: '',
+            username: '',
+            password: ''
+        };
+        
+        // Load saved configuration
+        function loadConfig() {
+            const savedConfig = localStorage.getItem('xtream-config');
+            if (savedConfig) {
+                config = JSON.parse(savedConfig);
+                document.getElementById('server-url').value = config.server;
+                document.getElementById('username').value = config.username;
+                document.getElementById('password').value = config.password;
+                document.getElementById('config-form').style.display = 'none';
+                document.getElementById('server-info').textContent = `Connected to: ${config.server}`;
+                loadChannels();
+            }
+        }
+        
+        // Save configuration
+        document.getElementById('save-config').addEventListener('click', function() {
+            config = {
+                server: document.getElementById('server-url').value.trim(),
+                username: document.getElementById('username').value.trim(),
+                password: document.getElementById('password').value.trim()
+            };
+            
+            localStorage.setItem('xtream-config', JSON.stringify(config));
+            document.getElementById('config-form').style.display = 'none';
+            document.getElementById('server-info').textContent = `Connected to: ${config.server}`;
+            loadChannels();
+        });
+        
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                
+                this.classList.add('active');
+                document.getElementById(`${this.dataset.tab}-tab`).classList.add('active');
+                
+                if (this.dataset.tab === 'live' && document.getElementById('live-channels').children.length === 0) {
+                    loadLiveChannels();
+                } else if (this.dataset.tab === 'vod' && document.getElementById('vod-channels').children.length === 0) {
+                    loadVodChannels();
+                }
+            });
+        });
+        
+        // Load channels
+        function loadChannels() {
+            loadLiveChannels();
+        }
+        
+        async function loadLiveChannels() {
+            try {
+                document.getElementById('live-loading').style.display = 'block';
+                document.getElementById('live-error').style.display = 'none';
+                
+                const response = await fetch(`${config.server}/player_api.php?username=${config.username}&password=${config.password}&action=get_live_streams`);
+                
+                if (!response.ok) {
+                    throw new Error('Failed to load channels');
+                }
+                
+                const channels = await response.json();
+                renderChannels(channels, 'live-channels');
+                document.getElementById('live-loading').style.display = 'none';
+            } catch (error) {
+                document.getElementById('live-loading').style.display = 'none';
+                document.getElementById('live-error').textContent = error.message;
+                document.getElementById('live-error').style.display = 'block';
+            }
+        }
+        
+        async function loadVodChannels() {
+            try {
+                document.getElementById('vod-loading').style.display = 'block';
+                document.getElementById('vod-error').style.display = 'none';
+                
+                const response = await fetch(`${config.server}/player_api.php?username=${config.username}&password=${config.password}&action=get_vod_streams`);
+                
+                if (!response.ok) {
+                    throw new Error('Failed to load movies');
+                }
+                
+                const channels = await response.json();
+                renderChannels(channels, 'vod-channels');
+                document.getElementById('vod-loading').style.display = 'none';
+            } catch (error) {
+                document.getElementById('vod-loading').style.display = 'none';
+                document.getElementById('vod-error').textContent = error.message;
+                document.getElementById('vod-error').style.display = 'block';
+            }
+        }
+        
+        function renderChannels(channels, containerId) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            
+            if (!Array.isArray(channels)) {
+                container.innerHTML = '<div class="error">No channels available</div>';
+                return;
+            }
+            
+            channels.forEach(channel => {
+                const item = document.createElement('div');
+                item.className = 'channel-item';
+                item.textContent = channel.name;
+                item.addEventListener('click', () => {
+                    playChannel(channel.stream_id, containerId === 'live-channels' ? 'live' : 'movie');
+                });
+                container.appendChild(item);
+            });
+        }
+        
+        function playChannel(channelId, type) {
+            const streamUrl = `${config.server}/${type}/${config.username}/${config.password}/${channelId}`;
+            const player = document.getElementById('video-player');
+            
+            player.src = streamUrl;
+            player.play().catch(error => {
+                alert('Error playing stream: ' + error.message);
+            });
+        }
+        
+        // Initialize
+        loadConfig();
+    </script>
+</body>
+</html>
